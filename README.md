@@ -1,6 +1,5 @@
 # Junseong Kim
 
-Computational Chemistry / Machine Learning Researcher at University of Suwon
 
 ---
 
