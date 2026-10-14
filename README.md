@@ -37,22 +37,15 @@ ChemRxiv · March 2026
 ## Selected projects
 
 <p>
-  <a href="https://github.com/junseong2im/PhysSim-Olfactory-Mixture-Similarity"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/physsim-dark.svg">
-    <img src="./assets/physsim-light.svg" width="350" alt="PhysSim: physics-inspired latent dynamics for olfactory mixture similarity. Python, PyTorch, RDKit.">
-  </picture></a>
-  <a href="https://github.com/junseong2im/Universe-Multi-NeuralNetwork"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/umn-dark.svg">
-    <img src="./assets/umn-light.svg" width="350" alt="Universe Multi Neural Network: differentiable N-body simulation for olfactory mixture similarity. Python, PyTorch, RDKit.">
-  </picture></a>
-  <a href="https://github.com/junseong2im/GravityFluid"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/gravityfluid-dark.svg">
-    <img src="./assets/gravityfluid-light.svg" width="350" alt="GravityFluid: whole-ship early-design prototype with physics screening and CFD/FEA planning. Python, Taichi, FastAPI.">
-  </picture></a>
-  <a href="https://github.com/junseong2im/SPOT"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/spot-dark.svg">
-    <img src="./assets/spot-light.svg" width="350" alt="SPOT: shared workout schedules and customizable crew routines. Next.js, TypeScript, PostgreSQL.">
-  </picture></a>
+<a href="https://github.com/junseong2im/PhysSim-Olfactory-Mixture-Similarity"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/physsim-dark.svg"><img src="./assets/physsim-light.svg" width="350" alt="PhysSim: physics-inspired latent dynamics for olfactory mixture similarity. Python, PyTorch, RDKit."></picture></a>
+&nbsp;
+<a href="https://github.com/junseong2im/Universe-Multi-NeuralNetwork"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/umn-dark.svg"><img src="./assets/umn-light.svg" width="350" alt="Universe Multi Neural Network: differentiable N-body simulation for olfactory mixture similarity. Python, PyTorch, RDKit."></picture></a>
+</p>
+
+<p>
+<a href="https://github.com/junseong2im/GravityFluid"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/gravityfluid-dark.svg"><img src="./assets/gravityfluid-light.svg" width="350" alt="GravityFluid: whole-ship early-design prototype with physics screening and CFD/FEA planning. Python, Taichi, FastAPI."></picture></a>
+&nbsp;
+<a href="https://github.com/junseong2im/SPOT"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/spot-dark.svg"><img src="./assets/spot-light.svg" width="350" alt="SPOT: shared workout schedules and customizable crew routines. Next.js, TypeScript, PostgreSQL."></picture></a>
 </p>
 
 [View all repositories ↗](https://github.com/junseong2im?tab=repositories)
