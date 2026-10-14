@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="282" viewBox="0 0 600 282" role="img" aria-labelledby="title desc">
+<title id="title">SPOT.</title><desc id="desc">Shared workout schedules.. Crew routines, made personal. NEXT.JS · TYPESCRIPT · POSTGRESQL</desc>
+<rect x="1" y="1" width="598" height="280" rx="14" fill="#101923" stroke="#304153" stroke-width="2"/>
+<text x="28" y="40" fill="#65D8CF" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="600" >04 / WEB APPLICATION</text>
+<text x="28" y="92" fill="#EFF5FA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="38" font-weight="650" >SPOT.</text>
+<text x="28" y="139" fill="#A7B8CA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="400" >Shared workout schedules.</text>
+<text x="28" y="169" fill="#A7B8CA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="400" >Crew routines, made personal.</text>
+<path d="M28 207H572" stroke="#304153"/>
+<text x="28" y="247" fill="#A7B8CA" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="400" >NEXT.JS · TYPESCRIPT · POSTGRESQL</text>
+<g fill="none" stroke="#65D8CF" stroke-width="2"><path d="M541 246L560 227M544 227H560V243"/></g>
+<rect x="504" y="50" width="11" height="11" rx="2" fill="#304153"/><rect x="504" y="68" width="11" height="11" rx="2" fill="#304153"/><rect x="522" y="50" width="11" height="11" rx="2" fill="#304153"/><rect x="522" y="68" width="11" height="11" rx="2" fill="#FFA488"/><rect x="540" y="50" width="11" height="11" rx="2" fill="#304153"/><rect x="540" y="68" width="11" height="11" rx="2" fill="#304153"/></svg>

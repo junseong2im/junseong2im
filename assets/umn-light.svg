@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="282" viewBox="0 0 600 282" role="img" aria-labelledby="title desc">
+<title id="title">Universe Multi Neural Network</title><desc id="desc">Molecular fingerprints meet. differentiable N-body simulation. PYTHON · PYTORCH · RDKIT</desc>
+<rect x="1" y="1" width="598" height="280" rx="14" fill="#F5F8FC" stroke="#D6E0EB" stroke-width="2"/>
+<text x="28" y="40" fill="#087F8C" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="600" >02 / DIFFERENTIABLE SIMULATION</text>
+<text x="28" y="92" fill="#172333" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="29" font-weight="650" >Universe Multi Neural Network</text>
+<text x="28" y="139" fill="#53667D" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="400" >Molecular fingerprints meet</text>
+<text x="28" y="169" fill="#53667D" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="400" >differentiable N-body simulation.</text>
+<path d="M28 207H572" stroke="#D6E0EB"/>
+<text x="28" y="247" fill="#53667D" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="400" >PYTHON · PYTORCH · RDKIT</text>
+<g fill="none" stroke="#087F8C" stroke-width="2"><path d="M541 246L560 227M544 227H560V243"/></g>
+<ellipse cx="546" cy="68" rx="23" ry="9" transform="rotate(-45 546 68)" fill="none" stroke="#D6E0EB" stroke-width="2"/><circle cx="546" cy="68" r="4" fill="#CB573B"/></svg>

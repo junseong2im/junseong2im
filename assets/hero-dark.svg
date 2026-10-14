@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+<title id="title">Junseong Kim | Physics. Perception. Code.</title><desc id="desc">Research and software by junseong2im, with an abstract orbital diagram.</desc>
+<rect x="1" y="1" width="958" height="358" rx="18" fill="#101923" stroke="#304153"/>
+<path d="M32 1H928" stroke="#65D8CF" stroke-width="2"/>
+<text x="44" y="53" fill="#A7B8CA" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="400" >JUNSEONG2IM / RESEARCH + SOFTWARE</text>
+<text x="42" y="139" fill="#EFF5FA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="68" font-weight="700" >Junseong Kim</text>
+<text x="45" y="189" fill="#A7B8CA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="30" font-weight="400" >Physics. Perception. Code.</text>
+<g transform="translate(778 176) scale(1)" fill="none">
+<circle r="36" stroke="#304153" stroke-width="1" stroke-dasharray="3 7"/>
+<circle r="75" stroke="#304153" stroke-width="1" stroke-dasharray="3 7"/>
+<circle r="114" stroke="#304153" stroke-width="1" stroke-dasharray="3 7"/>
+<path d="M-135 0H135M0-135V135" stroke="#304153" stroke-width="1"/>
+<ellipse rx="122" ry="49" transform="rotate(-35)" stroke="#65D8CF" stroke-opacity=".55" stroke-width="1.6"/>
+<ellipse rx="122" ry="49" transform="rotate(35)" stroke="#65D8CF" stroke-opacity=".55" stroke-width="1.6"/>
+<ellipse rx="122" ry="49" transform="rotate(90)" stroke="#65D8CF" stroke-opacity=".55" stroke-width="1.6"/>
+<circle r="9" fill="#65D8CF"/><circle r="17" stroke="#65D8CF" stroke-opacity=".28"/>
+<circle cx="100" cy="-68" r="7" fill="#FFA488"/><circle cx="100" cy="-68" r="13" stroke="#FFA488" stroke-opacity=".3"/>
+<circle cx="-100" cy="67" r="7" fill="#65D8CF"/><circle cx="-100" cy="67" r="13" stroke="#65D8CF" stroke-opacity=".3"/>
+<circle cx="-28" cy="-102" r="7" fill="#65D8CF"/><circle cx="-28" cy="-102" r="13" stroke="#65D8CF" stroke-opacity=".3"/>
+<circle cx="77" cy="48" r="7" fill="#FFA488"/><circle cx="77" cy="48" r="13" stroke="#FFA488" stroke-opacity=".3"/>
+</g>
+<text x="680" y="325" fill="#A7B8CA" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="13" font-weight="400" letter-spacing="2">IDEAS IN MOTION</text>
+<rect x="44" y="252" width="518" height="64" rx="10" fill="#172330" stroke="#304153"/>
+<text x="64" y="292" fill="#65D8CF" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="22" font-weight="600" >&gt;</text>
+<defs><clipPath id="reveal"><rect class="type-reveal" x="96" y="265" width="430" height="40"/></clipPath></defs>
+<style>
+@keyframes reveal { from { width: 0; } to { width: 430px; } }
+.type-reveal { animation: reveal 1.7s steps(25,end) .3s both; }
+@media (prefers-reduced-motion: reduce) { .type-reveal { animation: none; } }
+</style>
+<text x="96" y="292" fill="#EFF5FA" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="22" font-weight="400" clip-path="url(#reveal)">model · simulate · build</text>
+</svg>
