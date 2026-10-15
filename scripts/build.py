@@ -852,7 +852,7 @@ def build_scent(state, W=1000):
     players = len(state["players"])
     body.append(text(f"총 {state['total']}번 조합 · 조향사 {players}명", tx, y, C["muted"], 20, SMALL))
     y += 38
-    for ln in wrap("▼ 아래 향료를 골라 이슈를 제출하면 1~2분 뒤 이 병에 섞여요", SMALL, 20, maxw):
+    for ln in wrap("▼ 아래 향료를 누르고 이슈 화면에서 Create를 누르면 1~2분 뒤 섞여요", SMALL, 20, maxw):
         body.append(text(ln, tx, y, C["lav"], 20, SMALL))
         y += 28
     H = max(y + 16, by + 26 * p + 48)
