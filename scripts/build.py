@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Pixel-art SVG generator for the profile README.
 
-    python scripts/build.py                  # static assets -> assets/*.svg
-    python scripts/build.py stats OUT.svg    # live stats card (run daily by the workflow)
+    python scripts/build.py                # static assets -> assets/*.svg
+    python scripts/build.py live OUT_DIR   # cards that depend on GitHub data (daily workflow)
+    python scripts/build.py play OUT_DIR   # add a note to the scent lab (issue workflow;
+                                           # reads SCENT_TITLE / SCENT_PLAYER / REPLY_FILE)
 
 Text is rendered to paths with the Galmuri pixel fonts (SIL OFL 1.1, by Lee Minseo),
 so the SVGs look identical everywhere without any font loading.
@@ -166,12 +168,6 @@ def svg(w, h, body, css="", title=""):
             f'<style>{BASE_CSS}{css}</style>{body}</svg>')
 
 
-def save(name, content):
-    with open(os.path.join(ASSETS, name), "w", encoding="utf-8", newline="\n") as f:
-        f.write(content)
-    print(f"  {name:28s} {len(content) / 1024:7.1f} KB")
-
-
 def wrap(s, font, size, max_w):
     lines, cur = [], ""
     for word in s.split(" "):
@@ -196,7 +192,10 @@ HEART = [".rr..rr.", "rwrrrrrr", "rwrrrrrr", "rrrrrrrr", ".rrrrrr.", "..rrrr..",
 MAP = ["pppppppppppp", "pggggpgggggp", "pgxggpggxggp", "pggxgpgxgggp", "pgggxxxggggp", "pggggpggxxgp",
        "pgggggpgggxp", "pgggggpggggp", "pppppppppppp"]
 
-ICON_PAL = {"w": "#e6ecff", "s": "#9aa7d6", "y": C["amber"], "o": C["amber2"], "b": C["brown"], "d": C["brown2"],
+FLASK = ["...wwwwww...", "....w..w....", "....w..w....", "...w....w...", "..w......w..", ".wttttttttw.",
+         "wttqtttttttw", "wtttttqttttw", "wttttttttttw", ".wwwwwwwwww."]
+
+ICON_PAL = {"t": C["teal"], "q": "#ffffff", "w": "#e6ecff", "s": "#9aa7d6", "y": C["amber"], "o": C["amber2"], "b": C["brown"], "d": C["brown2"],
             "r": C["coral"], "p": C["brown"], "g": "#e9d9a8", "x": C["coral"]}
 
 
@@ -238,7 +237,10 @@ def build_hero():
                         f'y="{y}" width="5" height="5" fill="#fff"/>')
     # shimmering reflections on the lake
     for _ in range(18):
-        x, y = (rng.randrange(1300, 1630), rng.randrange(248, 330)) if rng.random() < .6 else             (rng.randrange(960, 1260), rng.randrange(248, 276))
+        if rng.random() < .6:
+            x, y = rng.randrange(1300, 1630), rng.randrange(248, 330)
+        else:
+            x, y = rng.randrange(960, 1260), rng.randrange(248, 276)
         body.append(f'<rect class="t{rng.randint(1, 3)}" x="{x}" y="{y}" width="{rng.choice((10, 16, 24))}" '
                     f'height="2" fill="{rng.choice(("#ffd58a", "#ffe9bd", "#9fc4ff"))}"/>')
     # fireflies around the plants
@@ -267,39 +269,76 @@ def build_hero():
         'shape-rendering="crispEdges" ', "")
 
 
+# ---------------------------------------------------------------- layout helpers
+
+def chips(items, x, y, max_x, h=24, size=12, font=None, gap=8):
+    """Flow a row of pixel chips, wrapping at max_x. Returns (svg, bottom y)."""
+    font = font or BOLD
+    out, cx, cy = [], x, y
+    for label, fill, fg in items:
+        w = font.width(label, size) + 20
+        if cx + w > max_x and cx > x:
+            cx, cy = x, cy + h + 8
+        out.append(f'<path fill="{fill}" d="{notch(cx, cy, w, h, 2)}"/>')
+        out.append(text(label, cx + 10, cy + round((h + size * .72) / 2), fg, size, font))
+        cx += w + gap
+    return "".join(out), cy + h
+
+
+def ago(when, now):
+    days = (now.date() - when.date()).days
+    if days <= 0:
+        return "오늘"
+    if days == 1:
+        return "어제"
+    if days < 7:
+        return f"{days}일 전"
+    if days < 30:
+        return f"{days // 7}주 전"
+    return f"{days // 30}개월 전"
+
+
+def josa(word, a, b):
+    """Pick 을/를-style particle from the last syllable."""
+    ch = word[-1]
+    if "가" <= ch <= "힣":
+        return a if (ord(ch) - 0xAC00) % 28 else b
+    return a
+
+
+KST = dt.timezone(dt.timedelta(hours=9))
+
+
 # ---------------------------------------------------------------- dialog box
 
-def build_dialog():
-    W, H = 1000, 214
-    T = 14.0
-    lines = [("물리 기반 AI · 계산 후각 · 소프트웨어", C["teal"]),
+def build_dialog(W=1000):
+    T, size = 14.0, 24
+    paras = [("물리 기반 AI · 계산 후각 · 소프트웨어", C["teal"]),
              ("혼합 향의 유사도를 연구하고,", C["cream"]),
              ("시뮬레이션과 웹 서비스를 만듭니다.", C["cream"])]
-    x0, ys, size = 52, [104, 144, 184], 24
+    lines = [(ln, col) for s, col in paras for ln in wrap(s, REG, size, W - 120)]
+    x0 = 52
+    ys = [104 + i * 40 for i in range(len(lines))]
+    H = ys[-1] + 30
     body = [panel(4, 36, W - 14, H - 44, fill=C["night"], border=C["ink"], accent=C["cream"])]
     body.append(f'<rect x="16" y="48" width="{W - 38}" height="2" fill="{C["line2"]}"/>')
-    body.append(stars(3, 26, (620, 60, 960, 190), ("#ffffff", C["lav"]), (2, 2, 2, 4)))
-    # name tag
+    body.append(stars(3, 26 * W // 1000, (W * 62 // 100, 60, W - 40, H - 24), ("#ffffff", C["lav"]), (2, 2, 2, 4)))
     name = "김준성 · JUNSEONG KIM"
     nw = BOLD.width(name, 24) + 40
     body.append(panel(30, 2, nw, 50, fill=C["amber"], border=C["ink"], shadow=False))
     body.append(text(name, 50, 36, "#2b1606", 24, BOLD))
-    # typed lines: a discrete clip width per line
-    keyed, caret = [], [(0.0, x0, ys[0])]
+    caret, defs = [(0.0, x0, ys[0])], []
     t = 0.5
-    defs = []
     for i, (s, color) in enumerate(lines):
-        adv = REG.advances(s, size)
-        ev = [(0.0, 0)]
-        acc = 0
-        for a in adv:
+        ev, acc = [(0.0, 0)], 0
+        for a in REG.advances(s, size):
             acc += a
             t += 0.085
             ev.append((t, acc))
             caret.append((t, x0 + acc + 4, ys[i]))
         ev.append((11.6, 0))
-        keyed.append(ev)
         t += 0.45
+        # the static width keeps the text readable wherever SMIL is unsupported
         defs.append(f'<clipPath id="c{i}"><rect x="{x0}" y="{ys[i] - 30}" height="40" width="{acc + 4:.0f}">'
                     f'{discrete("width", ev, T)}</rect></clipPath>')
         body.append(f'<g clip-path="url(#c{i})">{text(s, x0, ys[i], color, size, REG)}</g>')
@@ -320,6 +359,13 @@ def discrete(attr, events, T):
     return f'<animate attributeName="{attr}" calcMode="discrete" dur="{T}s" repeatCount="indefinite" keyTimes="{kt}" values="{vals}"/>'
 
 
+def discrete_translate(events, T):
+    kt = ";".join(f"{t / T:.4f}" for t, _, _ in events)
+    vals = ";".join(f"{x} {y}" for _, x, y in events)
+    return (f'<animateTransform attributeName="transform" type="translate" calcMode="discrete" dur="{T}s" '
+            f'repeatCount="indefinite" keyTimes="{kt}" values="{vals}"/>')
+
+
 # ---------------------------------------------------------------- buttons & headers
 
 BTN_ICONS = {
@@ -327,18 +373,25 @@ BTN_ICONS = {
     "doc": ["xxxxx.", "x...xx", "x.xx.x", "x....x", "x.xx.x", "x....x", "xxxxxx"],
     "box": ["xxx...", "xxxxxx", "x....x", "x....x", "x....x", "xxxxxx"],
     "code": ["..x....x..", ".x......x.", "x........x", ".x......x.", "..x....x.."],
+    "drop": ["..x...", ".xxx..", "xxxxx.", "xx.xx.", "xxxxx.", ".xxx.."],
 }
 
 
-def build_button(label, icon, color, delay):
-    W, H = 232, 64
+def shade(hex_color, k):
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return "#%02x%02x%02x" % (int(r * k), int(g * k), int(b * k))
+
+
+def build_button(label, icon, color, delay, W=None, fg="#1c1406"):
+    ic = BTN_ICONS[icon]
+    W = W or int(22 + len(ic[0]) * 4 + 12 + BOLD.width(label, 24) + 30)
+    H = 64
     body = [f'<path fill="{C["ink"]}" d="{notch(0, 4, W - 4, H - 8)}"/>',
             f'<path fill="{shade(color, .55)}" d="{notch(4, 12, W - 12, H - 20)}"/>',
             f'<path fill="{color}" d="{notch(4, 8, W - 12, H - 22)}"/>',
             f'<rect x="16" y="12" width="{W - 36}" height="3" fill="#fff" fill-opacity=".45"/>']
-    ic = BTN_ICONS[icon]
-    body.append(sprite(ic, {"x": "#1c1406"}, 22, 34 - len(ic) * 2, 4))
-    body.append(text(label, 22 + len(ic[0]) * 4 + 12, 42, "#1c1406", 24, BOLD))
+    body.append(sprite(ic, {"x": fg}, 22, 34 - len(ic) * 2, 4))
+    body.append(text(label, 22 + len(ic[0]) * 4 + 12, 42, fg, 24, BOLD))
     body.append(f'<clipPath id="b"><path d="{notch(4, 8, W - 12, H - 22)}"/></clipPath>'
                 f'<g clip-path="url(#b)"><path class="shine" fill="#fff" fill-opacity=".55" '
                 f'd="M-40 0h18l-30 64h-18zM-14 0h6l-30 64h-6z"/></g>')
@@ -347,13 +400,8 @@ def build_button(label, icon, color, delay):
     return svg(W, H, "".join(body), css, label)
 
 
-def shade(hex_color, k):
-    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
-    return "#%02x%02x%02x" % (int(r * k), int(g * k), int(b * k))
-
-
-def build_header(title, sub, icon_rows, icon_px, seed):
-    W, H = 1000, 76
+def build_header(title, sub, icon_rows, icon_px, W=1000):
+    H = 76
     body = [panel(0, 0, W - 8, H - 8, fill=C["panel"])]
     iw, ih = len(icon_rows[0]) * icon_px, len(icon_rows) * icon_px
     body.append(f'<g class="bob">{sprite(icon_rows, ICON_PAL, 26 + (48 - iw) // 2, 10 + (48 - ih) // 2, icon_px)}</g>')
@@ -361,15 +409,16 @@ def build_header(title, sub, icon_rows, icon_px, seed):
     tw = BOLD.width(title, 24)
     body.append(text(sub, 92 + tw + 18, 45, C["cream"], 20, SMALL))
     sx = int(92 + tw + 18 + SMALL.width(sub, 20) + 28)
-    sx += (4 - sx % 4)
+    sx += 4 - sx % 4
     ex = W - 64
     n = (ex - sx) // 12
-    dots = "".join(f"M{sx + i * 12} 32h4v4h-4z" for i in range(n))
-    body.append(f'<path fill="{C["line2"]}" d="{dots}"/>')
-    body.append(f'<rect class="run" x="{sx}" y="30" width="8" height="8" fill="{C["teal"]}"/>')
+    css = ""
+    if n > 3:
+        body.append(f'<path fill="{C["line2"]}" d="{"".join(f"M{sx + i * 12} 32h4v4h-4z" for i in range(n))}"/>')
+        body.append(f'<rect class="run" x="{sx}" y="30" width="8" height="8" fill="{C["teal"]}"/>')
+        css = (f"@keyframes run{{0%{{transform:translateX(0)}}100%{{transform:translateX({(n - 1) * 12}px)}}}}"
+               f".run{{animation:run {max(2.5, n / 12):.1f}s steps({n - 1}) infinite}}")
     body.append(sparkle(ex + 8, 22, C["amber"], "t1"))
-    css = (f"@keyframes run{{0%{{transform:translateX(0)}}100%{{transform:translateX({(n - 1) * 12}px)}}}}"
-           f".run{{animation:run {max(2.5, n / 12):.1f}s steps({n - 1}) infinite}}")
     return svg(W, H, "".join(body), css, f"{title} · {sub}")
 
 
@@ -378,12 +427,9 @@ def build_header(title, sub, icon_rows, icon_px, seed):
 def scene_physsim(x, y):
     """Perfume bottle with scent particles drifting up."""
     rows = ["........yyyy........", "........yyyy........", ".........gg.........", ".........gg.........",
-            "....gggggggggggg....", "...gwlllllllllllg...", "...gwlllllllllllg...", "...glllllllllllllg.."[:20],
+            "....gggggggggggg....", "...gwllllllllllg....", "...gwllllllllllg....", "...gllllllllllllg...",
             "...gpppppppppppg....", "...gpqpppppppppg....", "...gppppppppqppg....", "...gpppqpppppppg....",
-            "...gppppppppppppg..."[:20], "....gggggggggggg...."]
-    rows = [r.ljust(20, ".")[:20] for r in rows]
-    rows[7] = "...gllllllllllllg..."
-    rows[12] = "...gppppppppppppg..."
+            "...gppppppppppppg...", "....gggggggggggg...."]
     out = [sprite(rows, {"y": C["amber"], "g": "#cfd8ff", "w": "#ffffff", "l": "#2a2f6e", "p": C["lav"],
                          "q": "#d8d0ff"}, x + 8, y + 38, 4)]
     cols = [C["teal"], C["lav"], C["amber"], C["coral"], C["teal"], C["lav"]]
@@ -394,10 +440,10 @@ def scene_physsim(x, y):
 
 
 def scene_umn(x, y):
+    import math
     cx, cy = x + 48, y + 48
     out = []
     for r, n in ((18, 14), (30, 22), (41, 30)):
-        import math
         d = "".join(f"M{round(cx + r * math.cos(2 * math.pi * k / n)) - 1} "
                     f"{round(cy + r * math.sin(2 * math.pi * k / n)) - 1}h2v2h-2z" for k in range(n))
         out.append(f'<path fill="{C["line2"]}" d="{d}"/>')
@@ -448,16 +494,17 @@ SCENE_CSS = (
     "@keyframes wave{0%{transform:translateX(0)}100%{transform:translateX(16px)}}"
     ".wave{animation:wave 1.2s steps(4) infinite}.wave2{animation:wave 1.8s steps(4) infinite reverse}"
     "@keyframes fill{0%,8%{opacity:0}12%,85%{opacity:1}100%{opacity:0}}.fill{animation:fill 7s steps(1) infinite;opacity:0}"
+    "@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}.pulse{animation:pulse 1.4s steps(2) infinite}"
 )
 
 
-def build_card(p):
-    W, H = 490, 268
+def build_card(p, live=None, now=None):
+    """Project card. `live` = {"pushed": datetime, "stars": int} adds the status strip."""
+    W, H = 490, 300 if live else 268
     body = [panel(0, 0, W - 8, H - 8, fill=C["panel"])]
     body.append(f'<path fill="{C["ink"]}" d="{notch(20, 20, 104, 104)}"/>')
     body.append(f'<path fill="{C["night"]}" d="{notch(24, 24, 96, 96)}"/>')
     body.append(p["scene"](24, 24))
-    # tag chip
     tw = BOLD.width(p["tag"], 12) + 20
     body.append(f'<path fill="{p["color"]}" d="{notch(142, 24, tw, 24, 2)}"/>')
     body.append(text(p["tag"], 152, 41, C["ink"], 12, BOLD))
@@ -472,20 +519,31 @@ def build_card(p):
         body.append(f'<path fill="{C["line"]}" d="{notch(x, 212, w, 30, 2)}"/>')
         body.append(text(t, x + 11, 233, C["text"], 20, SMALL))
         x += w + 8
-    return svg(W, H, "".join(body), SCENE_CSS, f'{p["name"]} — {" ".join(p["desc"])}')
+    if live:
+        body.append(f'<path fill="{C["line"]}" d="{"".join(f"M{24 + i * 8} 254h4v2h-4z" for i in range(55))}"/>')
+        fresh = (now - live["pushed"]).days < 14
+        dot = C["leaf"] if fresh else C["dim"]
+        body.append(f'<rect class="{"pulse" if fresh else ""}" x="26" y="268" width="8" height="8" fill="{dot}"/>')
+        body.append(text(("ACTIVE · " if fresh else "") + "최근 업데이트 " + ago(live["pushed"], now), 44, 279,
+                         C["leaf"] if fresh else C["muted"], 20, SMALL))
+        if live["stars"]:
+            body.append(text(f"★ {live['stars']}", W - 34, 279, C["amber"], 20, SMALL, "end"))
+    s = svg(W, H, "".join(body), SCENE_CSS, f'{p["name"]} — {" ".join(p["desc"])}')
+    # intrinsic size 400px: two cards sit side by side on desktop and stack on phones
+    return s.replace(f'width="{W}" height="{H}"', f'width="400" height="{round(H * 400 / W)}"', 1)
 
 
 PROJECTS = [
-    dict(file="card-physsim.svg", name="PhysSim", tag="MAIN QUEST", color=C["amber"], sub="★ JCIM 2026 게재",
-         desc=["물리 기반 잠재 동역학으로", "혼합 향의 유사도를 예측합니다"], tech=["Python", "PyTorch", "RDKit"],
-         scene=scene_physsim),
-    dict(file="card-umn.svg", name="UMN", tag="RESEARCH", color=C["teal"], sub="◆ ChemRxiv 프리프린트",
-         desc=["분자 지문과 미분 가능한", "N체 시뮬레이션을 연결합니다"], tech=["Python", "PyTorch", "RDKit"],
-         scene=scene_umn),
-    dict(file="card-gravityfluid.svg", name="GravityFluid", tag="SIMULATION", color=C["coral"], sub="◆ 선박 설계 물리 검토",
-         desc=["선박 초기 설계의 물리 검토와", "CFD·FEA 계획을 세웁니다"], tech=["Python", "Taichi", "FastAPI"],
-         scene=scene_fluid),
-    dict(file="card-spot.svg", name="SPOT.", tag="WEB APP", color=C["lav"], sub="◆ 크루 운동 기록",
+    dict(file="card-physsim.svg", repo="PhysSim-Olfactory-Mixture-Similarity", name="PhysSim", tag="MAIN QUEST",
+         color=C["amber"], sub="★ JCIM 2026 게재", desc=["물리 기반 잠재 동역학으로", "혼합 향의 유사도를 예측합니다"],
+         tech=["Python", "PyTorch", "RDKit"], scene=scene_physsim),
+    dict(file="card-umn.svg", repo="Universe-Multi-NeuralNetwork", name="UMN", tag="RESEARCH", color=C["teal"],
+         sub="◆ ChemRxiv 프리프린트", desc=["분자 지문과 미분 가능한", "N체 시뮬레이션을 연결합니다"],
+         tech=["Python", "PyTorch", "RDKit"], scene=scene_umn),
+    dict(file="card-gravityfluid.svg", repo="GravityFluid", name="GravityFluid", tag="SIMULATION", color=C["coral"],
+         sub="◆ 선박 설계 물리 검토", desc=["선박 초기 설계의 물리 검토와", "CFD·FEA 계획을 세웁니다"],
+         tech=["Python", "Taichi", "FastAPI"], scene=scene_fluid),
+    dict(file="card-spot.svg", repo="SPOT", name="SPOT.", tag="WEB APP", color=C["lav"], sub="◆ 크루 운동 기록",
          desc=["운동 일정을 공유하고", "크루별 맞춤 루틴을 관리합니다"], tech=["Next.js", "TypeScript", "PostgreSQL"],
          scene=scene_spot),
 ]
@@ -493,36 +551,59 @@ PROJECTS = [
 
 # ---------------------------------------------------------------- research card
 
-def build_research():
-    W, H = 1000, 268
-    body = [panel(0, 0, W - 8, H - 8, fill=C["panel"], accent=C["amber"])]
-    body.append(f'<path fill="{C["ink"]}" d="{notch(28, 28, 136, 136)}"/>')
-    body.append(f'<path fill="{C["night"]}" d="{notch(32, 32, 128, 128)}"/>')
-    body.append(f'<g class="bob">{sprite(TROPHY, ICON_PAL, 48, 50, 8)}</g>')
-    for i, (sx, sy) in enumerate([(40, 40), (140, 58), (132, 136), (46, 124)]):
-        body.append(sparkle(sx, sy, C["amber"] if i % 2 else C["teal"], f"t{i % 3 + 1}"))
-    body.append(text("2026", 96, 200, C["amber"], 24, BOLD, "middle"))
-    body.append(text("PUBLISHED", 96, 226, C["muted"], 12, BOLD, "middle"))
-    x = 192
-    for label, fill, fg in (("ACHIEVEMENT UNLOCKED", C["amber"], C["ink"]), ("PEER-REVIEWED", C["teal"], C["ink"]),
-                            ("J. Chem. Inf. Model.", C["line"], C["text"])):
-        w = BOLD.width(label, 12) + 20
-        body.append(f'<path fill="{fill}" d="{notch(x, 32, w, 24, 2)}"/>')
-        body.append(text(label, x + 10, 49, fg, 12, BOLD))
-        x += w + 8
-    body.append(text("물리 기반 잠재 동역학을 활용한 혼합 향 유사도 예측", 192, 102, C["text"], 24, BOLD))
-    body.append(text("김준성 · Journal of Chemical Information and Modeling", 192, 138, C["cream"], 20, SMALL))
-    body.append(text("2026, 66(17), 10584–10592 · doi:10.1021/acs.jcim.6c01297", 192, 166, C["muted"], 20, SMALL))
+def build_research(W=1000, cites=0):
+    wide = W >= 900
+    body = []
+    if wide:
+        bx, by, tx, ty = 28, 28, 192, 32
+    else:
+        bx, by, tx, ty = 24, 24, 24, 176
+    body.append(f'<path fill="{C["ink"]}" d="{notch(bx, by, 136, 136)}"/>')
+    body.append(f'<path fill="{C["night"]}" d="{notch(bx + 4, by + 4, 128, 128)}"/>')
+    body.append(f'<g class="bob">{sprite(TROPHY, ICON_PAL, bx + 20, by + 22, 8)}</g>')
+    for i, (sx, sy) in enumerate([(12, 12), (112, 30), (104, 108), (18, 96)]):
+        body.append(sparkle(bx + sx, by + sy, C["amber"] if i % 2 else C["teal"], f"t{i % 3 + 1}"))
+    if wide:
+        body.append(text("2026", bx + 68, 200, C["amber"], 24, BOLD, "middle"))
+        body.append(text("PUBLISHED", bx + 68, 226, C["muted"], 12, BOLD, "middle"))
+    else:
+        body.append(text("2026", 184, 70, C["amber"], 36, BOLD))
+        body.append(text("PUBLISHED", 186, 98, C["muted"], 20, SMALL))
+        body.append(text("J. Chem. Inf. Model.", 186, 128, C["cream"], 20, SMALL))
+    items = [("ACHIEVEMENT UNLOCKED", C["amber"], C["ink"]), ("PEER-REVIEWED", C["teal"], C["ink"])]
+    if wide:
+        items.append(("J. Chem. Inf. Model.", C["line"], C["text"]))
+    if cites:
+        items.append((f"CITED BY {cites}", C["coral"], C["ink"]))
+    out, y = chips(items, tx, ty, W - 30)
+    body.append(out)
+    maxw = W - tx - 40
+    y += 46
+    for ln in wrap("물리 기반 잠재 동역학을 활용한 혼합 향 유사도 예측", BOLD, 24, maxw):
+        body.append(text(ln, tx, y, C["text"], 24, BOLD))
+        y += 34
+    y += 2
+    meta = ["김준성 · Journal of Chemical Information and Modeling",
+            "2026, 66(17), 10584–10592 · doi:10.1021/acs.jcim.6c01297"]
+    for k, m in enumerate(meta):
+        for ln in wrap(m, SMALL, 20, maxw):
+            body.append(text(ln, tx, y, C["cream"] if k == 0 else C["muted"], 20, SMALL))
+            y += 28
+    y += 12
     desc = ("여러 분자의 표현을 학습된 잠재 공간에서 변화시켜 혼합 향의 지각적 유사도를 예측합니다. "
             "물리적 상호작용에서 가져온 형태를 학습에 활용합니다.")
-    for i, line in enumerate(wrap(desc, SMALL, 20, W - 192 - 40)):
-        body.append(text(line, 192, 206 + i * 28, C["dim"] if False else C["muted"], 20, SMALL))
-    body.append(f'<clipPath id="pc"><path d="{notch(8, 8, W - 24, H - 24)}"/></clipPath>'
-                f'<g clip-path="url(#pc)"><path class="shine" fill="#fff" fill-opacity=".07" '
-                f'd="M-200 0h90l-120 270h-90zM-90 0h24l-120 270h-24z"/></g>')
-    css = ("@keyframes sh{0%,60%{transform:translateX(0)}100%{transform:translateX(1400px)}}"
+    for ln in wrap(desc, SMALL, 20, maxw):
+        body.append(text(ln, tx, y, C["muted"], 20, SMALL))
+        y += 28
+    H = max(y + 12, 268)
+    frame = panel(0, 0, W - 8, H - 8, fill=C["panel"], accent=C["amber"])
+    shine = (f'<clipPath id="pc"><path d="{notch(8, 8, W - 24, H - 24)}"/></clipPath>'
+             f'<g clip-path="url(#pc)"><path class="shine" fill="#fff" fill-opacity=".07" '
+             f'd="M-200 0h90l-120 {H}h-90zM-90 0h24l-120 {H}h-24z"/></g>')
+    css = (f"@keyframes sh{{0%,60%{{transform:translateX(0)}}100%{{transform:translateX({W + 400}px)}}}}"
            ".shine{animation:sh 6s 1s infinite}")
-    return svg(W, H, "".join(body), css, "발표한 연구: 물리 기반 잠재 동역학을 활용한 혼합 향 유사도 예측 (JCIM 2026)")
+    return svg(W, H, frame + "".join(body) + shine, css,
+               "발표한 연구: 물리 기반 잠재 동역학을 활용한 혼합 향 유사도 예측 (JCIM 2026)")
 
 
 # ---------------------------------------------------------------- inventory
@@ -551,15 +632,15 @@ def icon_path(slug):
         return re.search(r' d="([^"]+)"', f.read()).group(1)
 
 
-def build_inventory():
-    W, H = 1000, 268
+def build_inventory(W=1000):
+    wide = W >= 900
     T = 2.0 * 12
-    body = [panel(0, 0, W - 8, H - 8, fill=C["panel"])]
-    slots, gx = [], 28
+    body, slots = [], []
     for gi, (group, items) in enumerate(INVENTORY):
-        body.append(text(group, gx, 46, C["amber"], 20, SMALL))
-        for ii, (name, slug, color, _) in enumerate(items):
-            sx, sy = gx + ii * 76, 60
+        gx, gy = (28 + gi * (4 * 76 + 18), 46) if wide else (28, 46 + gi * 118)
+        body.append(text(group, gx, gy, C["amber"], 20, SMALL))
+        for ii, (name, slug, color, desc) in enumerate(items):
+            sx, sy = gx + ii * (76 if wide else 112), gy + 14
             body.append(f'<path fill="{C["ink"]}" d="{notch(sx, sy, 68, 68, 4)}"/>')
             body.append(f'<path fill="{C["night"]}" d="{notch(sx + 4, sy + 4, 60, 60, 4)}"/>')
             body.append(f'<rect x="{sx + 8}" y="{sy + 58}" width="52" height="2" fill="{C["line"]}"/>')
@@ -568,32 +649,32 @@ def build_inventory():
                             f'shape-rendering="geometricPrecision" d="{icon_path(slug)}"/>')
             else:
                 body.append(sprite(HEX, {"g": color}, sx + 10, sy + 12, 4))
-            body.append(text(name, sx + 34, sy + 88, C["muted"], 12, REG, "middle"))
-            slots.append((sx, sy, name, color, _))
-        gx += 4 * 76 + 18
-    # status bar
-    body.append(f'<path fill="{C["ink"]}" d="{notch(24, 172, W - 56, 64, 4)}"/>')
-    body.append(f'<path fill="{C["night"]}" d="{notch(28, 176, W - 64, 56, 4)}"/>')
-    body.append(text("▶", 48, 212, C["amber"], 20, SMALL, cls="blink"))
+            if wide:
+                body.append(text(name, sx + 34, sy + 88, C["muted"], 12, REG, "middle"))
+            slots.append((sx, sy, name, color, desc))
+    sy = 172 if wide else 46 + 3 * 118 - 8
+    sh = 64 if wide else 92
+    body.append(f'<path fill="{C["ink"]}" d="{notch(24, sy, W - 56, sh, 4)}"/>')
+    body.append(f'<path fill="{C["night"]}" d="{notch(28, sy + 4, W - 64, sh - 8, 4)}"/>')
+    body.append(text("▶", 48, sy + 40, C["amber"], 20, SMALL, cls="blink"))
     n = len(slots)
-    for i, (sx, sy, name, color, desc) in enumerate(slots):
+    for i, (_, _, name, color, desc) in enumerate(slots):
         ev = [(0.0, 0)] + ([(i * T / n, 1)] if i else [(0.0, 1)]) + ([((i + 1) * T / n, 0)] if i < n - 1 else [])
         vis = discrete("opacity", sorted({e[0]: e for e in ev}.values()), T)
-        body.append(f'<g opacity="0">{vis}{text(name, 76, 213, color, 24, BOLD)}'
-                    f'{text("— " + desc, 76 + BOLD.width(name, 24) + 14, 212, C["cream"], 20, SMALL)}</g>')
+        if wide:
+            label = (text(name, 76, sy + 41, color, 24, BOLD) +
+                     text("— " + desc, 76 + BOLD.width(name, 24) + 14, sy + 40, C["cream"], 20, SMALL))
+        else:
+            label = text(name, 76, sy + 40, color, 24, BOLD) + text(desc, 76, sy + 72, C["cream"], 20, SMALL)
+        body.append(f'<g opacity="0">{vis}{label}</g>')
     cur = sprite(["aaa......aaa", "a..........a", "a..........a", "", "", "", "", "", "", "a..........a",
                   "a..........a", "aaa......aaa"], {"a": C["amber"]}, 0, 0, 6)
     body.append(f'<g>{discrete_translate([(i * T / n, s[0] - 2, s[1] - 2) for i, s in enumerate(slots)], T)}{cur}</g>')
-    body.append(stars(5, 10, (700, 18, 960, 44), (C["lav"], "#fff")))
-    return svg(W, H, "".join(body), "", "사용하는 기술: Python, PyTorch, RDKit, NumPy, TypeScript, React, Next.js, "
-                                        "PostgreSQL, LaTeX, Git, Google Colab, VS Code")
-
-
-def discrete_translate(events, T):
-    kt = ";".join(f"{t / T:.4f}" for t, _, _ in events)
-    vals = ";".join(f"{x} {y}" for _, x, y in events)
-    return (f'<animateTransform attributeName="transform" type="translate" calcMode="discrete" dur="{T}s" '
-            f'repeatCount="indefinite" keyTimes="{kt}" values="{vals}"/>')
+    H = sy + sh + 32
+    body.append(stars(5, 10, (W - 300, 18, W - 40, 44), (C["lav"], "#fff")))
+    return svg(W, H, panel(0, 0, W - 8, H - 8, fill=C["panel"]) + "".join(body), "",
+               "사용하는 기술: Python, PyTorch, RDKit, NumPy, TypeScript, React, Next.js, "
+               "PostgreSQL, LaTeX, Git, Google Colab, VS Code")
 
 
 # ---------------------------------------------------------------- footer
@@ -608,7 +689,6 @@ def build_footer():
     body.append(sprite(["..mmmm..", ".mmmmmmm", "mmmmm...", "mmmm....", "mmmm....", "mmmmm...", ".mmmmmmm", "..mmmm.."],
                        {"m": "#ffe9b8"}, 880, 26, 4))
     body.append('<g class="shoot"><rect width="60" height="3" fill="url(#trail)"/><rect x="58" y="-1" width="5" height="5" fill="#fff"/></g>')
-    # skyline
     x, sky, wins = 0, [], []
     while x < W:
         w = rng.choice((32, 40, 48, 56, 64))
@@ -637,7 +717,158 @@ def build_footer():
     return svg(W, H, defs + "".join(body), css, "방문해 주셔서 감사합니다")
 
 
-# ---------------------------------------------------------------- live stats
+# ---------------------------------------------------------------- scent lab (issue-driven mini game)
+
+FAMILIES = ["플로럴", "시트러스", "우디", "스위트", "프레시", "머스키", "아쿠아틱"]
+NOTES = {  # id: (name, colour, family vector)
+    "lavender": ("라벤더", "#a99bff", (.6, 0, 0, 0, .5, 0, 0)),
+    "citrus": ("시트러스", "#ffd84a", (0, 1, 0, 0, .3, 0, 0)),
+    "rose": ("장미", "#ff6f9a", (1, 0, 0, .2, 0, 0, 0)),
+    "vanilla": ("바닐라", "#f6e3b4", (0, 0, 0, 1, 0, .2, 0)),
+    "sandalwood": ("샌달우드", "#c98a5a", (0, 0, 1, .1, 0, .3, 0)),
+    "musk": ("머스크", "#d9d2e9", (0, 0, .1, .2, 0, 1, 0)),
+    "mint": ("민트", "#7fe0b0", (0, .2, 0, 0, 1, 0, 0)),
+    "marine": ("바다", "#5ec8ff", (0, 0, 0, 0, .4, 0, 1)),
+}
+MIX_SIZE = 5
+
+
+def mix_vector(mix):
+    v = [0.0] * len(FAMILIES)
+    for k, m in enumerate(mix):
+        w = 1 + k * .25  # the newest note is the strongest
+        for i, x in enumerate(NOTES[m["note"]][2]):
+            v[i] += w * x
+    return v
+
+
+def cosine(a, b):
+    import math
+    na, nb = math.sqrt(sum(x * x for x in a)), math.sqrt(sum(x * x for x in b))
+    return sum(x * y for x, y in zip(a, b)) / (na * nb) if na and nb else None
+
+
+def mix_name(mix):
+    if not mix:
+        return "빈 병"
+    v = mix_vector(mix)
+    top = sorted(range(len(v)), key=lambda i: -v[i])
+    if v[top[1]] < v[top[0]] * .45:
+        return FAMILIES[top[0]] + " 향"
+    return f"{FAMILIES[top[1]]} {FAMILIES[top[0]]} 향"
+
+
+def load_state(out):
+    path = os.path.join(out, "scent.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return {"mix": [], "total": 0, "players": {}, "similarity": None}
+
+
+def play(out, title, player):
+    state = load_state(out)
+    note = title.split("|", 1)[1].strip().lower() if "|" in title else ""
+    if note not in NOTES or not re.fullmatch(r"[A-Za-z0-9-]{1,39}", player):
+        names = ", ".join(f"`{k}`" for k in NOTES)
+        return state, f"앗, 모르는 향료예요. 제목을 `scent|lavender` 형식으로 써 주세요.\n\n사용 가능한 향료: {names}"
+    prev = mix_vector(state["mix"])
+    state["mix"] = (state["mix"] + [{"note": note, "by": player,
+                                      "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}])[-MIX_SIZE:]
+    sim = cosine(prev, mix_vector(state["mix"]))
+    state["similarity"] = None if sim is None else round(sim, 4)
+    state["total"] += 1
+    state["players"][player] = state["players"].get(player, 0) + 1
+    name = NOTES[note][0]
+    reply = (f"@{player} 님이 **{name}**{josa(name, '을', '를')} 넣었어요! 🧪\n\n"
+             f"- 지금 향수: **{mix_name(state['mix'])}**\n"
+             + (f"- 직전 조합과의 유사도: **{sim * 100:.0f}%**\n" if sim is not None else "")
+             + f"- 지금까지 {state['total']}번 섞였어요\n\n"
+             f"[프로필에서 확인하기](https://github.com/{USER}#scent-lab) (이미지가 갱신되는 데 1~2분 걸릴 수 있어요)")
+    return state, reply
+
+
+def build_scent(state, W=1000):
+    wide = W >= 900
+    mix = state["mix"]
+    body = []
+    bx, by = (32, 40) if wide else ((W - 136) // 2, 32)
+    # bottle: 20x26 grid at 6px
+    p = 6
+    glass, liquid_top, liquid_bot = "#cfd8ff", 10, 23
+    rows = ["......yyyyyyyy......", "......yyyyyyyy......", "......yyyyyyyy......", "........gggg........",
+            "........gggg........", "........gggg........", ".....gggggggggg.....", "...gggggggggggggg...",
+            ".ggg............ggg.", ".g................g."]
+    rows += [".g................g."] * 14 + [".gg..............gg.", "..gggggggggggggggg.."]
+    body.append(f'<path fill="{C["ink"]}" d="{notch(bx - 16, by - 16, 20 * p + 32, 26 * p + 32)}"/>')
+    body.append(f'<path fill="{C["night"]}" d="{notch(bx - 12, by - 12, 20 * p + 24, 26 * p + 24)}"/>')
+    body.append(f'<rect x="{bx + 2 * p}" y="{by + 9 * p}" width="{16 * p}" height="{15 * p}" fill="#20245a"/>')
+    if mix:
+        rows_per = (liquid_bot - liquid_top + 1) / MIX_SIZE
+        filled = round(rows_per * len(mix))
+        top = liquid_bot + 1 - filled
+        for k, m in enumerate(mix):  # oldest at the bottom
+            r1 = liquid_bot + 1 - round(rows_per * k)
+            r0 = liquid_bot + 1 - round(rows_per * (k + 1))
+            body.append(f'<rect x="{bx + 2 * p}" y="{by + r0 * p}" width="{16 * p}" height="{(r1 - r0) * p}" '
+                        f'fill="{NOTES[m["note"]][1]}"/>')
+        body.append(f'<rect x="{bx + 2 * p}" y="{by + top * p}" width="{16 * p}" height="{p // 2}" fill="#fff" fill-opacity=".35"/>')
+        for i in range(5):
+            body.append(f'<rect class="bub" style="animation-delay:{i * .7:.1f}s" x="{bx + (4 + i * 3) * p}" '
+                        f'y="{by + (liquid_bot - 1) * p}" width="{p - 2}" height="{p - 2}" fill="#fff" fill-opacity=".7"/>')
+        bub_h = (liquid_bot - 1 - top) * p
+    else:
+        bub_h = 0
+    body.append(sprite(rows, {"y": C["amber"], "g": glass}, bx, by, p))
+    body.append(f'<rect x="{bx + 3 * p}" y="{by + 10 * p}" width="{p}" height="{8 * p}" fill="#fff" fill-opacity=".5"/>')
+    # text column
+    tx, ty = (bx + 20 * p + 56, 56) if wide else (28, by + 26 * p + 64)
+    maxw = W - tx - 36
+    body.append(text("지금 향수", tx, ty, C["muted"], 20, SMALL))
+    body.append(text(mix_name(mix), tx, ty + 40, C["amber"], 36, BOLD))
+    y = ty + 80
+    if mix:
+        for m in reversed(mix):
+            name, col, _ = NOTES[m["note"]]
+            body.append(f'<rect x="{tx}" y="{y - 14}" width="12" height="12" fill="{col}"/>')
+            body.append(text(name, tx + 22, y, C["text"], 20, SMALL))
+            body.append(text("@" + m["by"], tx + 130, y, C["muted"], 20, SMALL))
+            y += 28
+    else:
+        for ln in wrap("아직 아무 향료도 들어가지 않았어요. 첫 번째 조향사가 되어 주세요!", SMALL, 20, maxw):
+            body.append(text(ln, tx, y, C["cream"], 20, SMALL))
+            y += 28
+    y += 10
+    sim = state.get("similarity")
+    if sim is not None:
+        body.append(text(f"직전 조합과 유사도 {sim * 100:.0f}%", tx, y, C["teal"], 20, SMALL))
+        segs, on = 20, round(sim * 20)
+        bar_x = tx + SMALL.width(f"직전 조합과 유사도 {sim * 100:.0f}%", 20) + 16
+        if bar_x + segs * 9 > W - 36:
+            bar_x, y = tx, y + 14
+        body.append(f'<path fill="{C["line"]}" d="{"".join(f"M{bar_x + s * 9} {y - 14}h7v12h-7z" for s in range(segs))}"/>')
+        body.append(f'<path fill="{C["teal"]}" d="{"".join(f"M{bar_x + s * 9} {y - 14}h7v12h-7z" for s in range(on))}"/>')
+        y += 28
+    players = len(state["players"])
+    body.append(text(f"총 {state['total']}번 조합 · 조향사 {players}명", tx, y, C["muted"], 20, SMALL))
+    y += 38
+    for ln in wrap("▼ 아래 향료를 골라 이슈를 제출하면 1~2분 뒤 이 병에 섞여요", SMALL, 20, maxw):
+        body.append(text(ln, tx, y, C["lav"], 20, SMALL))
+        y += 28
+    H = max(y + 16, by + 26 * p + 48)
+    css = (f"@keyframes bub{{0%{{transform:translateY(0);opacity:0}}20%{{opacity:1}}"
+           f"100%{{transform:translateY(-{max(bub_h, 6)}px);opacity:0}}}}.bub{{animation:bub 3.5s steps(12) infinite;opacity:0}}")
+    body.append(stars(13, 14, (W - 220, 20, W - 40, 60) if wide else (W - 140, 20, W - 30, 60), ("#fff", C["lav"])))
+    return svg(W, H, panel(0, 0, W - 8, H - 8, fill=C["panel"]) + "".join(body), css,
+               f"향 조합 실험실: 지금 향수는 {mix_name(mix)}")
+
+
+def build_note_button(note):
+    name, color, _ = NOTES[note]
+    return build_button(name, "drop", color, (list(NOTES).index(note) % 4) * .4, W=176)
+
+
+# ---------------------------------------------------------------- live data
 
 def fetch(url, token=None):
     req = urllib.request.Request(url, headers={"User-Agent": USER + "-profile"})
@@ -645,6 +876,14 @@ def fetch(url, token=None):
         req.add_header("Authorization", "Bearer " + token)
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.read()
+
+
+def fetch_json(url, token=None):
+    return json.loads(fetch(url, token))
+
+
+def parse_time(s):
+    return dt.datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(KST)
 
 
 def gather():
@@ -662,18 +901,127 @@ def gather():
         cm = re.match(r"(\d+) contribution", tips.get(cid, ""))
         days.append((date, int(cm.group(1)) if cm else 0, level))
     days.sort()
-    user = json.loads(fetch(f"https://api.github.com/users/{USER}", token))
-    repos = json.loads(fetch(f"https://api.github.com/users/{USER}/repos?per_page=100&type=owner", token))
+    user = fetch_json(f"https://api.github.com/users/{USER}", token)
+    repos = fetch_json(f"https://api.github.com/users/{USER}/repos?per_page=100&type=owner", token)
     langs = {}
     for r in repos:
         if r["fork"]:
             continue
-        for k, v in json.loads(fetch(r["languages_url"], token)).items():
+        for k, v in fetch_json(r["languages_url"], token).items():
             if k != "Jupyter Notebook":  # notebook outputs would drown everything else
                 langs[k] = langs.get(k, 0) + v
-    avatar = fetch(user["avatar_url"] + "&s=120")
+    by_name = {r["name"]: r for r in repos}
+    cards = {p["repo"]: {"pushed": parse_time(by_name[p["repo"]]["pushed_at"]),
+                         "stars": by_name[p["repo"]]["stargazers_count"]}
+             for p in PROJECTS if p["repo"] in by_name}
     return dict(total=total, days=days, repos=sum(not r["fork"] for r in repos), created=user["created_at"][:7],
-                langs=sorted(langs.items(), key=lambda kv: -kv[1]), avatar=avatar)
+                langs=sorted(langs.items(), key=lambda kv: -kv[1]), avatar=fetch(user["avatar_url"] + "&s=120"),
+                cards=cards, quests=gather_quests(token), cites=gather_citations())
+
+
+def gather_citations():
+    doi = "10.1021/acs.jcim.6c01297"
+    try:
+        return int(fetch_json(f"https://api.openalex.org/works/doi:{doi}").get("cited_by_count") or 0)
+    except Exception:
+        try:
+            return int(fetch_json(f"https://api.crossref.org/works/{doi}")["message"].get("is-referenced-by-count", 0))
+        except Exception:
+            return 0
+
+
+def gather_quests(token, limit=6):
+    events = fetch_json(f"https://api.github.com/users/{USER}/events/public?per_page=100", token)
+    rows, pushes = [], {}
+    for e in events:
+        repo = e["repo"]["name"]
+        if repo == f"{USER}/{USER}":
+            continue  # profile edits are not quests
+        when, pl, short = parse_time(e["created_at"]), e["payload"], repo.split("/")[1]
+        if e["type"] == "PushEvent":
+            key = (repo, when.date())
+            if key not in pushes:
+                pushes[key] = {"kind": "push", "repo": short, "when": when, "pushes": []}
+                rows.append(pushes[key])
+            pushes[key]["pushes"].append((repo, pl.get("before"), pl.get("head")))
+        elif e["type"] == "CreateEvent" and pl.get("ref_type") == "repository":
+            rows.append({"kind": "create", "repo": short, "when": when})
+        elif e["type"] == "PullRequestEvent" and pl.get("action") in ("opened", "closed"):
+            merged = pl.get("action") == "closed" and (pl.get("pull_request") or {}).get("merged")
+            if pl.get("action") == "opened" or merged:
+                rows.append({"kind": "merge" if merged else "pr", "repo": short, "when": when,
+                             "num": pl.get("number")})
+        elif e["type"] == "ReleaseEvent":
+            rows.append({"kind": "release", "repo": short, "when": when,
+                         "tag": (pl.get("release") or {}).get("tag_name", "")})
+        elif e["type"] == "MemberEvent":
+            rows.append({"kind": "member", "repo": short, "when": when})
+        elif e["type"] == "WatchEvent":
+            rows.append({"kind": "star", "repo": short, "when": when})
+    rows = rows[:limit]
+    for r in rows:
+        if r["kind"] == "push":
+            n = 0
+            for repo, before, head in r["pushes"]:
+                try:
+                    if not before or set(before) == {"0"}:
+                        raise ValueError
+                    n += fetch_json(f"https://api.github.com/repos/{repo}/compare/{before}...{head}", token)["total_commits"]
+                except Exception:
+                    n += 1
+            r["commits"] = n
+            del r["pushes"]
+    return rows
+
+
+QUEST_STYLE = {
+    "push": ("●", C["teal"], lambda r: f"{r['repo']}에 커밋 {r['commits']}개"),
+    "create": ("+", C["amber"], lambda r: f"새 저장소 {r['repo']} 생성"),
+    "pr": ("◆", C["lav"], lambda r: f"{r['repo']}에 PR #{r['num']} 생성"),
+    "merge": ("◆", C["leaf"], lambda r: f"{r['repo']}의 PR #{r['num']} 병합"),
+    "release": ("★", C["amber"], lambda r: f"{r['repo']} {r['tag']} 릴리스"),
+    "member": ("♥", C["coral"], lambda r: f"{r['repo']} 협업 합류"),
+    "star": ("★", C["amber"], lambda r: f"{r['repo']}에 스타"),
+}
+
+
+def build_quests(rows, now, W=1000):
+    wide = W >= 900
+    rh = 44 if wide else 70
+    body = []
+    if not rows:
+        rows_svg = text("조용한 날들… 다음 퀘스트를 준비하는 중이에요", 28, 56, C["muted"], 20, SMALL)
+        H = 92
+        return svg(W, H, panel(0, 0, W - 8, H - 8, fill=C["panel"]) + rows_svg, "", "최근 활동 없음")
+    for i, r in enumerate(rows):
+        glyph, col, fmt = QUEST_STYLE[r["kind"]]
+        y = 24 + i * rh
+        g = [f'<path fill="{C["night"]}" d="{notch(20, y, W - 48, rh - 6, 2)}"/>',
+             f'<rect x="20" y="{y + 4}" width="4" height="{rh - 14}" fill="{col}"/>',
+             text(glyph, 40, y + 28, col, 20, SMALL)]
+        when = ago(r["when"], now)
+        cw = SMALL.width(when, 20) + 20
+        g.append(f'<path fill="{C["line"]}" d="{notch(66, y + 7, cw, 26, 2)}"/>')
+        g.append(text(when, 76, y + 27, C["text"], 20, SMALL))
+        label = fmt(r)
+        if wide:
+            g.append(text(label, 66 + cw + 16, y + 28, C["cream"], 20, SMALL))
+            g.append(text(r["when"].strftime("%m.%d"), W - 44, y + 28, C["dim"], 20, SMALL, "end"))
+        else:
+            g.append(text(r["when"].strftime("%m.%d"), W - 44, y + 28, C["dim"], 20, SMALL, "end"))
+            while SMALL.width(label, 20) > W - 110 and len(label) > 4:
+                label = label[:-2] + "…"
+            g.append(text(label, 44, y + 58, C["cream"], 20, SMALL))
+        if i == 0 and (now - r["when"]).days < 3:
+            nx = (66 + cw + 16 + SMALL.width(label, 20) + 12) if wide else (66 + cw + 10)
+            g.append(f'<g class="blink"><path fill="{C["coral"]}" d="{notch(nx, y + 9, 52, 22, 2)}"/>'
+                     f'{text("NEW", nx + 10, y + 25, C["ink"], 12, BOLD)}</g>')
+        body.append(f'<g class="row" style="animation-delay:{i * .25:.2f}s">{"".join(g)}</g>')
+    H = 24 + len(rows) * rh + 24
+    css = ("@keyframes row{0%{transform:translateX(-24px);opacity:0}100%{transform:translateX(0);opacity:1}}"
+           ".row{animation:row .5s steps(4) both}")
+    return svg(W, H, panel(0, 0, W - 8, H - 8, fill=C["panel"]) + "".join(body), css,
+               "최근 활동: " + " / ".join(QUEST_STYLE[r["kind"]][2](r) for r in rows))
 
 
 LANG_COLORS = {"Python": "#6fb5ff", "TypeScript": "#5ee7d8", "JavaScript": "#f1e05a", "HTML": "#ff7a59",
@@ -696,106 +1044,162 @@ def streaks(days):
     return cur, longest
 
 
-def build_stats(d):
+def build_stats(d, W=1000):
     from PIL import Image
-    W, H = 1000, 368
-    body = [panel(0, 0, W - 8, H - 8, fill=C["panel"])]
-    # emblem from the avatar, sampled to 12x12
+    wide = W >= 900
+    body = []
+    eb = 136 if wide else 104
+    ep = 8 if wide else 6
     im = Image.open(io.BytesIO(d["avatar"])).convert("RGB").resize((12, 12), Image.NEAREST)
-    body.append(f'<path fill="{C["ink"]}" d="{notch(24, 24, 136, 136)}"/>')
-    body.append(f'<path fill="{C["night"]}" d="{notch(28, 28, 128, 128)}"/>')
+    body.append(f'<path fill="{C["ink"]}" d="{notch(24, 24, eb, eb)}"/>')
+    body.append(f'<path fill="{C["night"]}" d="{notch(28, 28, eb - 8, eb - 8)}"/>')
+    off = 24 + (eb - 12 * ep) // 2
     px = []
     for yy in range(12):
         for xx in range(12):
             r, g, b = im.getpixel((xx, yy))
             if min(r, g, b) > 225:
                 continue
-            px.append(f'<rect x="{44 + xx * 8}" y="{44 + yy * 8}" width="8" height="8" fill="#{r:02x}{g:02x}{b:02x}"/>')
+            px.append(f'<rect x="{off + xx * ep}" y="{off + yy * ep}" width="{ep}" height="{ep}" fill="#{r:02x}{g:02x}{b:02x}"/>')
     body.append(f'<g class="bob">{"".join(px)}</g>')
-    body.append(text("PLAYER", 92, 182, C["muted"], 12, BOLD, "middle"))
-    body.append(text(f"since {d['created'].replace('-', '.')}", 92, 204, C["cream"], 20, SMALL, "middle"))
-    # name + stat tiles
-    body.append(text("Kim Junseong", 188, 58, C["text"], 24, BOLD))
-    body.append(text("@" + USER, 188 + BOLD.width("Kim Junseong", 24) + 14, 57, C["muted"], 20, SMALL))
+    since = f"since {d['created'].replace('-', '.')}"
+    stamp = dt.datetime.now(KST).strftime("%Y.%m.%d")
     cur, longest = streaks(d["days"])
     tiles = [("올해 기여", f"{d['total']:,}", C["amber"]), ("현재 연속", f"{cur}일", C["coral"]),
              ("최장 연속", f"{longest}일", C["teal"]), ("공개 저장소", str(d["repos"]), C["lav"])]
-    for i, (label, val, col) in enumerate(tiles):
-        tx = 188 + i * 196
-        body.append(f'<path fill="{C["ink"]}" d="{notch(tx, 78, 184, 82, 4)}"/>')
-        body.append(f'<path fill="{C["night"]}" d="{notch(tx + 4, 82, 176, 74, 4)}"/>')
-        body.append(f'<rect x="{tx + 4}" y="82" width="4" height="74" fill="{col}"/>')
-        body.append(text(val, tx + 22, 124, col, 36, BOLD))
-        body.append(text(label, tx + 22, 146, C["muted"], 12, REG))
+    if wide:
+        body.append(text("PLAYER", 92, 182, C["muted"], 12, BOLD, "middle"))
+        body.append(text(since, 92, 204, C["cream"], 20, SMALL, "middle"))
+        body.append(text("Kim Junseong", 188, 58, C["text"], 24, BOLD))
+        body.append(text("@" + USER, 188 + BOLD.width("Kim Junseong", 24) + 14, 57, C["muted"], 20, SMALL))
+        body.append(text(f"UPDATED {stamp} · 매일 자동 갱신", W - 30, 58, C["dim"], 12, REG, "end"))
+        tile_xy = [(188 + i * 196, 78) for i in range(4)]
+        tw, hm_xy, pitch, cell, lang_xy, lang_w = 184, (24, 236), 11, 9, (640, 236), W - 30 - 640
+    else:
+        body.append(text("Kim Junseong", 148, 58, C["text"], 24, BOLD))
+        body.append(text("@" + USER, 148, 88, C["muted"], 20, SMALL))
+        body.append(text(since, 148, 116, C["cream"], 20, SMALL))
+        tw = (W - 48 - 12 - 8) // 2
+        tile_xy = [(24 + (i % 2) * (tw + 12), 148 + (i // 2) * 94) for i in range(4)]
+        hm_xy, pitch, cell, lang_xy, lang_w = (24, 370), 9, 7, (24, 498), W - 56
+    for (label, val, col), (tx, ty) in zip(tiles, tile_xy):
+        body.append(f'<path fill="{C["ink"]}" d="{notch(tx, ty, tw, 82, 4)}"/>')
+        body.append(f'<path fill="{C["night"]}" d="{notch(tx + 4, ty + 4, tw - 8, 74, 4)}"/>')
+        body.append(f'<rect x="{tx + 4}" y="{ty + 4}" width="4" height="74" fill="{col}"/>')
+        body.append(text(val, tx + 22, ty + 46, col, 36, BOLD))
+        body.append(text(label, tx + 22, ty + 68, C["muted"], 12 if wide else 20, REG if wide else SMALL))
     # heatmap
-    days = d["days"][-53 * 7:]
-    first = dt.date.fromisoformat(days[0][0])
-    offset = (first.weekday() + 1) % 7  # GitHub weeks start on Sunday
+    weeks = 53 if wide else 52
+    days = d["days"][-weeks * 7:]
+    offset = (dt.date.fromisoformat(days[0][0]).weekday() + 1) % 7  # GitHub weeks start on Sunday
     ramp = ["#1d2150", "#4a3b8f", "#8a4f9e", "#d9706a", "#ffbf5a"]
-    body.append(text("ADVENTURE MAP · 지난 1년의 기여", 24, 236, C["amber"], 20, SMALL))
+    hx, hy = hm_xy
+    body.append(text("ADVENTURE MAP · 지난 1년의 기여", hx, hy, C["amber"], 20, SMALL))
     cells = []
-    for i, (date, n, lvl) in enumerate(days):
+    for i, (_, _, lvl) in enumerate(days):
         k = i + offset
-        wk, wd = k // 7, k % 7
-        cells.append(f'<rect class="hm" style="animation-delay:{wk * .03:.2f}s" x="{24 + wk * 11}" y="{248 + wd * 11}" '
-                     f'width="9" height="9" fill="{ramp[lvl]}"/>')
+        cells.append(f'<rect class="hm" style="animation-delay:{k // 7 * .03:.2f}s" x="{hx + k // 7 * pitch}" '
+                     f'y="{hy + 12 + k % 7 * pitch}" width="{cell}" height="{cell}" fill="{ramp[lvl]}"/>')
     body.append("".join(cells))
     lk = len(days) - 1 + offset
-    body.append(f'<rect class="blink" x="{22 + lk // 7 * 11}" y="{246 + lk % 7 * 11}" width="13" height="13" '
-                f'fill="none" stroke="#fff" stroke-width="2"/>')
+    body.append(f'<rect class="blink" x="{hx - 2 + lk // 7 * pitch}" y="{hy + 10 + lk % 7 * pitch}" '
+                f'width="{cell + 4}" height="{cell + 4}" fill="none" stroke="#fff" stroke-width="2"/>')
     # languages
-    lx = 640
-    body.append(text("TOP LANGUAGES", lx, 236, C["amber"], 20, SMALL))
+    lx, ly = lang_xy
+    body.append(text("TOP LANGUAGES", lx, ly, C["amber"], 20, SMALL))
     tot = sum(v for _, v in d["langs"]) or 1
+    rowh, fs, name_w = (18, 12, 92) if wide else (24, 20, 132)
+    pct_w = 50 if wide else 70
+    segs = 20 if wide else 16
+    seg = (lang_w - name_w - pct_w) // segs
     for i, (name, v) in enumerate(d["langs"][:5]):
-        y = 254 + i * 18
+        y = ly + 18 + i * rowh
         pct = v / tot * 100
         col = LANG_COLORS.get(name, C["muted"])
-        body.append(text(name, lx, y + 11, C["text"], 12, REG))
-        segs = 20
+        body.append(text(name, lx, y + fs - 1, C["text"], fs, REG if wide else SMALL))
         on = max(1, round(pct / 100 * segs))
-        bar = "".join(f"M{lx + 92 + s * 9} {y + 2}h7v10h-7z" for s in range(segs))
-        body.append(f'<path fill="{C["line"]}" d="{bar}"/>')
-        on_bar = "".join(f"M{lx + 92 + s * 9} {y + 2}h7v10h-7z" for s in range(on))
-        body.append(f'<path class="bar" style="animation-delay:{i * .15:.2f}s" fill="{col}" d="{on_bar}"/>')
-        body.append(text(f"{pct:.1f}%", W - 30, y + 11, C["muted"], 12, REG, "end"))
-    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime("%Y.%m.%d")
-    body.append(text(f"UPDATED {stamp} · 매일 자동 갱신", W - 30, 58, C["dim"], 12, REG, "end"))
+        bar = lambda n: "".join(f"M{lx + name_w + s * seg} {y + 2}h{seg - 2}v{fs - 2}h-{seg - 2}z" for s in range(n))
+        body.append(f'<path fill="{C["line"]}" d="{bar(segs)}"/>')
+        body.append(f'<path class="bar" style="animation-delay:{i * .15:.2f}s" fill="{col}" d="{bar(on)}"/>')
+        body.append(text(f"{pct:.1f}%", lx + lang_w, y + fs - 1, C["muted"], fs, REG if wide else SMALL, "end"))
+    if wide:
+        H = 368
+    else:
+        body.append(text(f"UPDATED {stamp}", 24, ly + 18 + 5 * rowh + 30, C["dim"], 20, SMALL))
+        H = ly + 18 + 5 * rowh + 56
     css = ("@keyframes hm{0%{opacity:0}100%{opacity:1}}.hm{animation:hm .4s steps(2) both}"
            "@keyframes bar{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}"
-           f".bar{{transform-origin:{lx + 92}px 0;animation:bar .9s steps(8) both}}")
-    return svg(W, H, "".join(body), css, f"활동 기록: 지난 1년 기여 {d['total']}회, 공개 저장소 {d['repos']}개")
+           f".bar{{transform-origin:{lx + name_w}px 0;animation:bar .9s steps(8) both}}")
+    return svg(W, H, panel(0, 0, W - 8, H - 8, fill=C["panel"]) + "".join(body), css,
+               f"활동 기록: 지난 1년 기여 {d['total']}회, 공개 저장소 {d['repos']}개")
 
 
 # ---------------------------------------------------------------- main
 
+MOBILE = 520
+
+
+def write(path, content):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
+    print(f"  {os.path.relpath(path, ROOT):34s} {len(content) / 1024:7.1f} KB")
+
+
+def write_scent(out, state):
+    with open(os.path.join(out, "scent.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(state, f, ensure_ascii=False, indent=1)
+    write(os.path.join(out, "scent.svg"), build_scent(state))
+    write(os.path.join(out, "scent-m.svg"), build_scent(state, MOBILE))
+
+
 def main():
     load_fonts()
-    if len(sys.argv) > 1 and sys.argv[1] == "stats":
-        out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ASSETS, "stats.svg")
-        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-        content = build_stats(gather())
-        with open(out, "w", encoding="utf-8", newline="\n") as f:
-            f.write(content)
-        print(f"wrote {out} ({len(content) / 1024:.1f} KB)")
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "static"
+    if cmd == "live":  # daily: everything that depends on GitHub data
+        out = sys.argv[2]
+        d = gather()
+        now = dt.datetime.now(KST)
+        write(os.path.join(out, "stats.svg"), build_stats(d))
+        write(os.path.join(out, "stats-m.svg"), build_stats(d, MOBILE))
+        write(os.path.join(out, "quests.svg"), build_quests(d["quests"], now))
+        write(os.path.join(out, "quests-m.svg"), build_quests(d["quests"], now, MOBILE))
+        write(os.path.join(out, "research.svg"), build_research(cites=d["cites"]))
+        write(os.path.join(out, "research-m.svg"), build_research(MOBILE, cites=d["cites"]))
+        for p in PROJECTS:
+            write(os.path.join(out, p["file"]), build_card(p, d["cards"].get(p["repo"]), now))
+        write_scent(out, load_state(out))
         return
+    if cmd == "play":  # issue-driven: add one note to the scent lab
+        out, title, player = sys.argv[2], os.environ["SCENT_TITLE"], os.environ["SCENT_PLAYER"]
+        state, reply = play(out, title, player)
+        write_scent(out, state)
+        with open(os.environ.get("REPLY_FILE", os.path.join(out, "..", "reply.md")), "w", encoding="utf-8") as f:
+            f.write(reply)
+        return
+    a = lambda name: os.path.join(ASSETS, name)
     print("building assets/")
-    save("hero.svg", build_hero())
-    save("dialog.svg", build_dialog())
-    save("btn-orcid.svg", build_button("ORCID", "id", C["leaf"], 0))
-    save("btn-paper.svg", build_button("JCIM 논문", "doc", C["amber"], .5))
-    save("btn-repos.svg", build_button("전체 저장소", "box", C["lav"], 1))
-    save("btn-read.svg", build_button("논문 읽기", "doc", C["amber"], 0))
-    save("btn-code.svg", build_button("연구 코드", "code", C["teal"], .6))
-    save("h-quest.svg", build_header("QUEST LOG", "만들고 있는 것들", SWORD, 4, 1))
-    save("h-research.svg", build_header("ACHIEVEMENT", "발표한 연구", TROPHY, 4, 2))
-    save("h-inventory.svg", build_header("INVENTORY", "사용하는 기술", CHEST, 4, 3))
-    save("h-stats.svg", build_header("PLAYER STATUS", "활동 기록", HEART, 6, 4))
-    for p in PROJECTS:
-        save(p["file"], build_card(p))
-    save("research.svg", build_research())
-    save("inventory.svg", build_inventory())
-    save("footer.svg", build_footer())
+    write(a("hero.svg"), build_hero())
+    write(a("dialog.svg"), build_dialog())
+    write(a("dialog-m.svg"), build_dialog(MOBILE))
+    write(a("btn-orcid.svg"), build_button("ORCID", "id", C["leaf"], 0, W=232))
+    write(a("btn-paper.svg"), build_button("JCIM 논문", "doc", C["amber"], .5, W=232))
+    write(a("btn-repos.svg"), build_button("전체 저장소", "box", C["lav"], 1, W=232))
+    write(a("btn-read.svg"), build_button("논문 읽기", "doc", C["amber"], 0, W=232))
+    write(a("btn-code.svg"), build_button("연구 코드", "code", C["teal"], .6, W=232))
+    for key, title, sub, icon, px in (("quest", "QUEST LOG", "만들고 있는 것들", SWORD, 4),
+                                      ("recent", "RECENT QUESTS", "최근 활동", MAP, 4),
+                                      ("research", "ACHIEVEMENT", "발표한 연구", TROPHY, 4),
+                                      ("scent", "SCENT LAB", "향 조합 실험실", FLASK, 4),
+                                      ("inventory", "INVENTORY", "사용하는 기술", CHEST, 4),
+                                      ("stats", "PLAYER STATUS", "활동 기록", HEART, 6)):
+        write(a(f"h-{key}.svg"), build_header(title, sub, icon, px))
+        write(a(f"h-{key}-m.svg"), build_header(title, sub, icon, px, MOBILE))
+    write(a("inventory.svg"), build_inventory())
+    write(a("inventory-m.svg"), build_inventory(MOBILE))
+    for note in NOTES:
+        write(a(f"note-{note}.svg"), build_note_button(note))
+    write(a("footer.svg"), build_footer())
 
 
 if __name__ == "__main__":

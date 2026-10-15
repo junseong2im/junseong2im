@@ -1,0 +1,54 @@
+name: Scent lab
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: output-branch
+  cancel-in-progress: false
+
+jobs:
+  play:
+    if: startsWith(github.event.issue.title, 'scent|')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: .fonts
+          key: galmuri-2.40.3
+      - run: pip install fonttools pillow
+      - name: Fetch the current output branch
+        run: git clone -q --depth 1 --branch output "https://github.com/${{ github.repository }}.git" dist || mkdir -p dist
+      # issue fields are untrusted: pass them through env, never inline them into the script
+      - run: python scripts/build.py play dist
+        env:
+          SCENT_TITLE: ${{ github.event.issue.title }}
+          SCENT_PLAYER: ${{ github.event.issue.user.login }}
+          REPLY_FILE: ${{ runner.temp }}/reply.md
+      - name: Publish to the output branch
+        working-directory: dist
+        run: |
+          rm -rf .git
+          git init -q -b output
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Scent lab: issue #${{ github.event.issue.number }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" output
+      - name: Reply and close the issue
+        run: |
+          gh issue comment "$NUM" --body-file "$RUNNER_TEMP/reply.md"
+          gh issue close "$NUM" --reason completed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}

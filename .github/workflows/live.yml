@@ -1,0 +1,45 @@
+name: Update live cards
+
+on:
+  schedule:
+    - cron: "17 15 * * *" # 00:17 KST
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/**", ".github/workflows/live.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: output-branch
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: .fonts
+          key: galmuri-2.40.3
+      - run: pip install fonttools pillow
+      - name: Fetch the current output branch (keeps the scent lab state)
+        run: git clone -q --depth 1 --branch output "https://github.com/${{ github.repository }}.git" dist || mkdir -p dist
+      - run: python scripts/build.py live dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to the output branch
+        working-directory: dist
+        run: |
+          rm -rf .git
+          git init -q -b output
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Update live cards"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" output
