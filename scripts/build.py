@@ -932,18 +932,18 @@ def gather_citations():
 
 def gather_quests(token, limit=6):
     events = fetch_json(f"https://api.github.com/users/{USER}/events/public?per_page=100", token)
-    rows, pushes = [], {}
+    rows = []
     for e in events:
         repo = e["repo"]["name"]
         if repo == f"{USER}/{USER}":
             continue  # profile edits are not quests
         when, pl, short = parse_time(e["created_at"]), e["payload"], repo.split("/")[1]
         if e["type"] == "PushEvent":
-            key = (repo, when.date())
-            if key not in pushes:
-                pushes[key] = {"kind": "push", "repo": short, "when": when, "pushes": []}
-                rows.append(pushes[key])
-            pushes[key]["pushes"].append((repo, pl.get("before"), pl.get("head")))
+            # a streak of pushes to one repo becomes a single row spanning those days
+            if not (rows and rows[-1]["kind"] == "push" and rows[-1]["full"] == repo):
+                rows.append({"kind": "push", "repo": short, "full": repo, "when": when, "pushes": []})
+            rows[-1]["since"] = when
+            rows[-1]["pushes"].append((repo, pl.get("before"), pl.get("head")))
         elif e["type"] == "CreateEvent" and pl.get("ref_type") == "repository":
             rows.append({"kind": "create", "repo": short, "when": when})
         elif e["type"] == "PullRequestEvent" and pl.get("action") in ("opened", "closed"):
@@ -970,7 +970,7 @@ def gather_quests(token, limit=6):
                 except Exception:
                     n += 1
             r["commits"] = n
-            del r["pushes"]
+            del r["pushes"], r["full"]
     return rows
 
 
@@ -1004,11 +1004,15 @@ def build_quests(rows, now, W=1000):
         g.append(f'<path fill="{C["line"]}" d="{notch(66, y + 7, cw, 26, 2)}"/>')
         g.append(text(when, 76, y + 27, C["text"], 20, SMALL))
         label = fmt(r)
+        since = r.get("since")
+        date = r["when"].strftime("%m.%d")
+        if since and since.date() != r["when"].date():
+            date = since.strftime("%m.%d") + "–" + date
         if wide:
             g.append(text(label, 66 + cw + 16, y + 28, C["cream"], 20, SMALL))
-            g.append(text(r["when"].strftime("%m.%d"), W - 44, y + 28, C["dim"], 20, SMALL, "end"))
+            g.append(text(date, W - 44, y + 28, C["dim"], 20, SMALL, "end"))
         else:
-            g.append(text(r["when"].strftime("%m.%d"), W - 44, y + 28, C["dim"], 20, SMALL, "end"))
+            g.append(text(date, W - 44, y + 28, C["dim"], 20, SMALL, "end"))
             while SMALL.width(label, 20) > W - 110 and len(label) > 4:
                 label = label[:-2] + "…"
             g.append(text(label, 44, y + 58, C["cream"], 20, SMALL))
