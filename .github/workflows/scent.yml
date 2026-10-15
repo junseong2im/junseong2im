@@ -24,8 +24,8 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .fonts
-          key: galmuri-2.40.3
-      - run: pip install fonttools pillow
+          key: fonts-pretendard-1.3.9-jbmono-2.304
+      - run: pip install fonttools
       - name: Fetch the current output branch
         run: git clone -q --depth 1 --branch output "https://github.com/${{ github.repository }}.git" dist || mkdir -p dist
       # issue fields are untrusted: pass them through env, never inline them into the script
