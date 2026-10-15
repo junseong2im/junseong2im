@@ -80,7 +80,14 @@ I study how people perceive the similarity of odor mixtures, and I build simulat
 
 <!-- activity:start -->
 ```text
-loading…
+2026-10-06  push    digital-project               +22 commits since 09-22
+2026-09-22  member  digital-project               joined as collaborator
+2026-09-22  push    digital-health-project        +1 commit
+2026-09-22  push    SPOT                          +2 commits since 09-21
+2026-09-21  push    digital-health-project        +1 commit
+2026-09-21  push    SPOT                          +15 commits since 09-20
+2026-09-20  push    digital-health-project        +1 commit
+2026-09-20  push    SPOT                          +26 commits
 ```
 <!-- activity:end -->
 
